@@ -1,0 +1,75 @@
+import pandas as pd
+import plotly.express as px
+
+# 1. Read datasets
+unemp = pd.read_csv(r"C:\Users\2015e\Downloads\Unemployment_Rate.csv")
+riots = pd.read_csv(r"C:\Users\2015e\Downloads\Riots.csv")
+
+# 2. Clean column names
+unemp.columns = unemp.columns.str.strip()
+riots.columns = riots.columns.str.strip()
+
+# 3. Transform unemployment data
+unemp_long = unemp.melt(id_vars="Country", var_name="Year", value_name="Unemployment_Rate")
+
+# Ensure Year is integer
+unemp_long["Year"] = unemp_long["Year"].astype(int)
+riots["Year"] = riots["Year"].astype(int)
+
+# 4. Merge datasets
+merged = pd.merge(riots, unemp_long, on=["Country", "Year"], how="inner")
+
+# 5. Filter for 2019–2023 and ensure correct order
+year_order = [2019, 2020, 2021, 2022, 2023]
+merged = merged[merged["Year"].isin(year_order)]
+
+# Convert Year to string for animation and enforce order
+merged["Year"] = merged["Year"].astype(int).astype(str)
+year_order_str = [str(y) for y in year_order]
+
+# 6. Add ISO-3 codes
+iso_map = {
+    "Chile": "CHL",
+    "Colombia": "COL",
+    "Egypt": "EGY",
+    "Indonesia": "IDN",
+    "Israel": "ISR",
+    "Japan": "JPN",
+    "Jordan": "JOR",
+    "Mexico": "MEX",
+    "Paraguay": "PRY",
+    "Peru": "PER"
+}
+merged["ISO3"] = merged["Country"].map(iso_map)
+
+# 7. Create interactive choropleth
+fig = px.choropleth(
+    merged,
+    locations="ISO3",
+    locationmode="ISO-3",
+    color="Social Riots",
+    hover_name="Country",
+    hover_data={
+        "Year": True,
+        "Unemployment_Rate": True,
+        "Social Riots": True
+    },
+    animation_frame="Year",
+    category_orders={"Year": year_order_str},
+    color_continuous_scale="Reds",
+    title="Riots vs Unemployment Rate (2019–2023)"
+)
+
+# 8. Layout settings
+fig.update_layout(
+    geo=dict(showframe=False, showcoastlines=True),
+    coloraxis_colorbar=dict(title="Social Riots"),
+)
+
+# 9. Show map
+fig.show(renderer="notebook_connected")
+
+# 10. Save to HTML
+fig.write_html(r"C:\Users\2015e\Downloads\Riots_Unemployment_Map.html")
+
+print("Exported to: C:\\Users\\2015e\\Downloads\\Riots_Unemployment_Map.html")

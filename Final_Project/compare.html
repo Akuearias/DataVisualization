@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Comparison</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body {
+    font-family: sans-serif;
+    display: flex;
+    margin: 0;
+  }
+  #sidebar {
+    width: 220px;
+    border-right: 1px solid #ccc;
+    padding: 10px;
+  }
+  #charts {
+    flex: 1;
+    padding: 10px;
+  }
+  .chart {
+    margin-bottom: 40px;
+  }
+  svg {
+    width: 100%;
+    height: 400px;
+  }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>Regions</h3>
+    <div id="checkboxes"></div>
+    <button id="backBtn" style="margin-top:20px;" onclick="window.location.href='map.html'"> Back to Map </button>
+  </div>
+
+  <div id="charts">
+    <div class="chart" id="riotsChart"><h3>Riots</h3></div>
+    <div class="chart" id="unemploymentChart"><h3>Unemployment rate</h3></div>
+  </div>
+
+<script>
+const riotsFile = "riots_data.csv";
+const unemploymentFile = "unemployment_rate_data.csv";
+
+Promise.all([
+  d3.csv(riotsFile),
+  d3.csv(unemploymentFile)
+]).then(([riotsData, unemploymentData]) => {
+  const regions = riotsData.map(d => d.Region);
+  const years = Object.keys(riotsData[0]).slice(1);
+
+  // 侧栏勾选框
+  const boxContainer = d3.select("#checkboxes");
+  regions.forEach(region => {
+    const label = boxContainer.append("label").style("display", "block");
+    label.append("input")
+      .attr("type", "checkbox")
+      .attr("value", region)
+      .on("change", updateCharts);
+    label.append("span").text(" " + region);
+  });
+
+  // 绘制函数
+function drawChart(container, data, selectedRegions, colorScale) {
+  const svgContainer = d3.select(container);
+  svgContainer.selectAll("svg").remove();
+  svgContainer.selectAll(".no-data").remove();
+
+  // 如果没有选中地区，就显示提示文字
+  if (selectedRegions.length === 0) {
+    svgContainer.append("div")
+      .attr("class", "no-data")
+      .style("text-align", "center")
+      .style("padding", "100px 0")
+      .style("color", "#888")
+      .style("font-size", "16px")
+      .text("Please select at least one region");
+    return;
+  }
+
+  // 正常绘图逻辑
+  const svg = svgContainer.append("svg");
+  const margin = {top: 20, right: 50, bottom: 30, left: 50};
+  const width = 800 - margin.left - margin.right;
+  const height = 350 - margin.top - margin.bottom;
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleLinear()
+    .domain(d3.extent(years, d => +d))
+    .range([0, width]);
+
+  // 计算 y 轴范围
+  const allValues = data
+    .filter(d => selectedRegions.includes(d.Region))
+    .flatMap(d => years.map(y => +d[y]))
+    .filter(v => !isNaN(v));
+
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(allValues) || 1])
+    .nice()
+    .range([height, 0]);
+
+  const line = d3.line()
+    .x(d => x(+d.year))
+    .y(d => y(+d.value));
+
+  g.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x).ticks(years.length));
+  g.append("g").call(d3.axisLeft(y));
+
+  // 绘制各地区折线
+  selectedRegions.forEach(region => {
+    const row = data.find(r => r.Region === region);
+    const points = years.map(y => ({year: y, value: +row[y]}));
+    g.append("path")
+      .datum(points)
+      .attr("fill", "none")
+      .attr("stroke", colorScale(region))
+      .attr("stroke-width", 2)
+      .attr("d", line);
+  });
+}
+
+  const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+  function updateCharts() {
+    const selectedRegions = [];
+    d3.selectAll("#checkboxes input:checked").each(function() {
+      selectedRegions.push(this.value);
+    });
+    drawChart("#riotsChart", riotsData, selectedRegions, color);
+    drawChart("#unemploymentChart", unemploymentData, selectedRegions, color);
+  }
+
+  d3.select("#backBtn").on("click", () => {
+    window.location.href = "map.html";
+  });
+
+    drawChart("#riotsChart", riotsData, [], color);
+    drawChart("#unemploymentChart", unemploymentData, [], color);
+
+});
+</script>
+</body>
+</html>
